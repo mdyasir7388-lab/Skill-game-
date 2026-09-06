@@ -6,9 +6,7 @@
   <title>Skill Game</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -29,9 +27,7 @@
       margin-bottom: 8px;
     }
 
-    p {
-      color: #aaa;
-    }
+    p { color: #aaa; }
 
     button {
       width: 100%;
@@ -41,7 +37,6 @@
       border-radius: 10px;
       font-size: 18px;
       font-weight: bold;
-      cursor: pointer;
     }
 
     #create {
@@ -89,27 +84,26 @@
 
 <body>
 
-  <div class="box">
+<div class="box">
 
-    <h1>🎮 Skill Game</h1>
-    <p>Play. Compete. Win.</p>
+  <h1>🎮 Skill Game</h1>
+  <p>Play. Compete. Win.</p>
 
-    <button id="create">CREATE ROOM</button>
+  <button id="create">CREATE ROOM</button>
 
-    <input id="roomCode" placeholder="Enter Room Code">
+  <input id="roomCode" placeholder="Enter Room Code">
 
-    <button id="join">JOIN ROOM</button>
+  <button id="join">JOIN ROOM</button>
 
-    <div id="message"></div>
+  <div id="message"></div>
 
-    <div id="result">
-      <div>Your Room Code</div>
-      <h2 id="showCode"></h2>
-      <div id="roomLink"></div>
-    </div>
-
+  <div id="result">
+    <div>Your Room Code</div>
+    <h2 id="showCode"></h2>
+    <div id="roomLink"></div>
   </div>
 
+</div>
 
 <script>
 
@@ -120,16 +114,16 @@ const SUPABASE_KEY =
   "YOUR_SUPABASE_PUBLISHABLE_KEY";
 
 
-function createPlayerId() {
+function getPlayerId() {
 
-  let playerId = localStorage.getItem("skill_player_id");
+  let id = localStorage.getItem("skill_player_id");
 
-  if (!playerId) {
-    playerId = crypto.randomUUID();
-    localStorage.setItem("skill_player_id", playerId);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("skill_player_id", id);
   }
 
-  return playerId;
+  return id;
 }
 
 
@@ -139,91 +133,137 @@ async function createRoom() {
 
   message.textContent = "Room create ho raha hai...";
 
-  const playerId = createPlayerId();
+  const playerId = getPlayerId();
 
   const response = await fetch(
-    SUPABASE_URL + "/rest/v1/rpc/create_game_room",
+    SUPABASE_URL + "/rest/v1/game_room",
     {
       method: "POST",
 
       headers: {
         "Content-Type": "application/json",
         "apikey": SUPABASE_KEY,
-        "Authorization": "Bearer " + SUPABASE_KEY
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Prefer": "return=representation"
       },
 
       body: JSON.stringify({
-        p_player_id: playerId,
-        p_display_name: "Player"
+        id: crypto.randomUUID(),
+        room_code: Math.random()
+          .toString(36)
+          .substring(2, 7)
+          .toUpperCase(),
+        status: "waiting",
+        max_players: 4
       })
     }
   );
 
-
   const data = await response.json();
 
+  console.log(data);
 
   if (!response.ok) {
 
-    console.log(data);
-
     message.textContent =
-      "Room create nahi hua: " +
-      (data.message || data.hint || "Unknown error");
+      "Room create error: " +
+      (data.message || "Unknown error");
 
     return;
   }
 
+  const room = data[0];
 
-  const code = data.room_code;
+  document.getElementById("showCode").textContent =
+    room.room_code;
 
-  document.getElementById("showCode").textContent = code;
-
-
-  const link =
+  document.getElementById("roomLink").textContent =
     window.location.origin +
     window.location.pathname +
     "?room=" +
-    code;
+    room.room_code;
 
-
-  document.getElementById("roomLink").textContent = link;
-
-  document.getElementById("result").style.display = "block";
+  document.getElementById("result").style.display =
+    "block";
 
   message.textContent =
     "✅ Room database mein create ho gaya!";
 }
 
 
+async function joinRoom() {
+
+  const message = document.getElementById("message");
+
+  const code =
+    document.getElementById("roomCode")
+    .value
+    .trim()
+    .toUpperCase();
+
+  if (!code) {
+    message.textContent = "Room Code enter karo";
+    return;
+  }
+
+  message.textContent =
+    "Room check ho raha hai...";
+
+  const response = await fetch(
+    SUPABASE_URL +
+    "/rest/v1/game_room?room_code=eq." +
+    encodeURIComponent(code) +
+    "&select=id,room_code,status,max_players",
+    {
+      method: "GET",
+
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY
+      }
+    }
+  );
+
+  const data = await response.json();
+
+  console.log(data);
+
+  if (!response.ok || data.length === 0) {
+
+    message.textContent =
+      "❌ Room nahi mila";
+
+    return;
+  }
+
+  if (data[0].status !== "waiting") {
+
+    message.textContent =
+      "❌ Room ab waiting mein nahi hai";
+
+    return;
+  }
+
+  localStorage.setItem(
+    "skill_room_code",
+    code
+  );
+
+  message.textContent =
+    "✅ Room mil gaya!";
+
+  window.location.href =
+    window.location.pathname +
+    "?room=" +
+    code;
+}
+
+
 document.getElementById("create").onclick =
   createRoom;
 
-
 document.getElementById("join").onclick =
-  function () {
-
-    const code =
-      document.getElementById("roomCode")
-      .value
-      .trim()
-      .toUpperCase();
-
-
-    if (!code) {
-
-      alert("Room Code enter karo");
-
-      return;
-    }
-
-
-    window.location.href =
-      window.location.pathname +
-      "?room=" +
-      code;
-  };
-
+  joinRoom;
 
 </script>
 
